@@ -11,6 +11,7 @@ vne::tbd:: rbody can be empty and any of json attr may not be present
 
            log all incoming requests with json contents with timestamp
            add versioning in this module 
+           #vne::tbd:: create a backup of nginx config file before P1
 """
 
 import fileinput
@@ -19,9 +20,10 @@ import re
 import subprocess
 import urllib2
 
-from bottle import route, run, Bottle, request
+from bottle import run, Bottle, request
 
 import appconfig
+from __builtin__ import False
 
 g_rest_fd = Bottle()
 
@@ -83,13 +85,14 @@ def get_connection_config():
     read MQTT current appconfig and send in HTTP response 
     """
     print 'GET received'
-    if appconfig.get_app_module() != 'web':
-        print 'Invalid Module'
-        return -1 
+    try: 
+        if appconfig.get_app_module() != 'web':
+            return { "success" : False, "error" : "Invalid Request" }   
+        
+        return { "success" : True, "error" : "None" }
+    except: 
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
-    
-    return "Helloz..."
-
 
 @g_rest_fd.route('/api/v1/connection/mqtt', method='POST')
 def create_connection_config():
@@ -99,18 +102,19 @@ def create_connection_config():
     vne:: tbd:: which error
          tbd:: module name handling in all CRUD URLs
     """
+    try:         
+        if appconfig.get_app_module() != 'web':
+            print 'Invalid Module'
+            return { "success" : False, "error" : "Invalid Request" }
     
-    if appconfig.get_app_module() != 'web':
-        print 'Invalid Module'
-        return -1 
+        #Extract JSON payload 
+        rbody = json.load(request.body)
+        print 'POST received', request, rbody  
     
-    #Extract JSON payload 
-    rbody = json.load(request.body)
-    print 'POST received', request, rbody  
+        return process_connection_config(rbody)
+    except: 
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
-    retval = process_connection_config(rbody)   
-    
-    return #str(retval)
 
 @g_rest_fd.route('/api/v1/connection/mqtt', method='PUT')
 def update_connection_config():
@@ -121,15 +125,17 @@ def update_connection_config():
     
     if appconfig.get_app_module() != 'web':
         print 'Invalid Module'
-        return -1 
+        return { "success" : False, "error" : "Invalid Request" } 
     
-    #Extract JSON payload 
-    rbody = json.load(request.body)
-    print 'PUT received', request, rbody  
+    try:
+        #Extract JSON payload 
+        rbody = json.load(request.body)
+        print 'PUT received', request, rbody  
     
-    retval = process_connection_config(rbody)   
+        return process_connection_config(rbody)   
+    except: 
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
-    return #str(retval)
 
 @g_rest_fd.route('/api/v1/connection/mqtt', method='DELETE')
 def delete_connection_config():
@@ -139,13 +145,16 @@ def delete_connection_config():
     turn OFF the Nginx as well
     """
     print 'DELETE received'
-    if appconfig.get_app_module() != 'web':
-        print 'Invalid Module'
-        return -1 
+    try: 
+        if appconfig.get_app_module() != 'web':
+            print 'Invalid Module'
+            return { "success" : False, "error" : "Invalid Request" } 
     
-    #Stop nginx server
+        #Stop nginx server
+        return { "success" : True, "error" : "None" }
+    except: 
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }    
     
-    return
 
 def process_connection_config(rbody):
     """
@@ -153,19 +162,20 @@ def process_connection_config(rbody):
                2. ensure proper retval at any failure 
     """
     
-    retval = 1
+    retval = True
+    err_str = 'None'
     #validate secret token 
     if appconfig.get_auth_token() != rbody['auth_token']: 
         print 'Request Unauthorized', rbody['auth_token'], appconfig.get_auth_token()
-        return -1
+        return { "success" : False, "error" : "Request Unauthorized" }
     
     nginx_file = appconfig.get_nginx_config()
     
     print 'in process_connection_config', nginx_file
 
     #print rbody
-    
     #vne::tbd:: failure of nginx_file opening here
+    #vne::tbd:: create a backup of nginx config file before
     for line in fileinput.FileInput(nginx_file,inplace=1):
 
         # if TCP is enabled, update TCP Port    
@@ -175,7 +185,8 @@ def process_connection_config(rbody):
             elif rbody['tcp_enabled'] == '0':
                 line = line.replace(line,' '*8 + 'listen' + ' '*15 + '0' + ';')
             else: 
-                retval = -1
+                retval = False; err_str = 'tcp_enabled ' + rbody['tcp_enabled']
+                break
 
         # if TLS is enabled, update TLS port 
         if re.search( r'listen(\s*)(.*) ssl;$', line, re.M|re.I): 
@@ -183,8 +194,9 @@ def process_connection_config(rbody):
                 line = line.replace(line,' '*8 + 'listen' + ' '*15 + rbody['tls_port'] + ' ssl;')   
             elif rbody['tls_enabled'] == '0':
                 line = line.replace(line,' '*8 + 'listen' + ' '*15 + '0' + ' ssl;')
-            else: 
-                retval = -1
+            else:
+                retval = False; err_str = 'tls_enabled ' + rbody['tls_enabled']
+                break
                 
         #ssl_verify_client handling
         if re.search( r'ssl_verify_client(\s*)(.*);', line, re.M|re.I):
@@ -194,9 +206,14 @@ def process_connection_config(rbody):
                 elif rbody['client_auth_enabled'] == '0':
                     line = line.replace(line,' '*8 + 'ssl_verify_client' + ' '*15 + 'off;')
                 else: 
-                    retval = -1
+                    retval = False; err_str = 'client_auth_enabled ' + rbody['client_auth_enabled']
+                    break
                 
         print line.rstrip()
+    
+    if retval is False: 
+        pass
+        #vne::tbd:: overwrite original file and return from here only 
     
     srv_cert_file = appconfig.get_server_cert_file() 
     srv_cert_key_file = appconfig.get_server_cert_key_file()
@@ -232,13 +249,15 @@ def process_connection_config(rbody):
     elif rbody['tls_enabled'] == '0':
         print 'TLS disabled, doing nothing..'
     else: 
-        retval = -1
+        retval = False; err_str = 'tls_enabled ' + rbody['tls_enabled'] 
     
     #make config changes to nginx server 
-    subprocess.call(["service", "nginx", "reload"])
-    process_nginx_vmq_req(rbody)
-            
-    return retval
+    if retval is not False: 
+        #vne:: tbd: check the status and start if nginx is not already running
+        subprocess.call(["service", "nginx", "reload"])
+        return process_nginx_vmq_req(rbody)
+    else:             
+        return {"success" : retval, "error" : err_str }
 
 def process_sslcerts_nginx(filename):
     """
@@ -289,6 +308,7 @@ def process_sslcerts_nginx(filename):
 def process_nginx_vmq_req(rbody):
     """
     This function will send HTTP POST request to vmq node for user auth handling
+    vne:: add success: False failure scenarios here
     """
     
     vmq_port = appconfig.get_vmq_rest_port()
@@ -306,7 +326,7 @@ def process_nginx_vmq_req(rbody):
     response = urllib2.urlopen(req)
     print response.read()
     
-    return 1
+    return { "success" : True, "error" : "None" }
     
     
 #################### VERNEMQ MQTT SERVER MODULE ##########################
@@ -338,41 +358,44 @@ def get_vmq_config():
     """
     print 'GET received'
     
-    if appconfig.get_app_module() != 'mqtt':
-        print 'Invalid Module'
-        return -1 
+    try:
+        if appconfig.get_app_module() != 'mqtt':
+            print 'Invalid Module'
+            return { "success" : False, "error" : "Invalid Request" }
+        
+        return { "success" : True, "error" : "None" }
+    except: 
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
     
-    return "Helloz..."
-
-
 @g_rest_fd.route('/api/v1/internal/vmq', method='POST')
 def create_vmq_config():
     """
 
     """
+    try:
+        if appconfig.get_app_module() != 'mqtt':
+            print 'Invalid Module'
+            return { "success" : False, "error" : "Invalid Request" } 
     
-    if appconfig.get_app_module() != 'mqtt':
-        print 'Invalid Module'
-        return -1 
+        #Extract JSON payload 
+        rbody = json.load(request.body)
+        print 'POST received', request, rbody  
     
-    #Extract JSON payload 
-    rbody = json.load(request.body)
-    print 'POST received', request, rbody  
-    
-    retval = process_vmq_config(rbody)   
-    
-    return #str(retval)
+        return process_vmq_config(rbody)   
+    except: 
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
 
 def process_vmq_config(rbody):
     """
     process vmq password list received
     """
-    retval = 1
+    retval = True
+    err_str = 'None'
     #validate secret token 
     if appconfig.get_vmq_auth_token() != rbody['auth_token']: 
         print 'Request Unauthorized', rbody['auth_token'], appconfig.get_vmq_auth_token()
-        return -1
+        return { "success" : False, "error" : "Request Unauthorized" }
     
     vmq_config_file = '/etc/vernemq/vernemq.conf'
     vmq_pwd_file = ''
@@ -410,7 +433,7 @@ def process_vmq_config(rbody):
                 line = line.replace(line,'allow_anonymous = on')
             print line.rstrip()
     else:
-        retval = -1
+        retval = False; err_str = 'user_auth_enabled', rbody['user_auth_enabled']
     
     
     if rbody['user_auth_enabled'] == '1':
@@ -434,12 +457,14 @@ def process_vmq_config(rbody):
             pair = rbody['user_auth_list'].pop()
             if len(rbody['user_auth_list']) != 0:
                 if ':' in pair.keys()[0]:
-                    return -1
+                    retval = False; err_str = 'Invalid User ', pair.key()[0]
+                    break
                 line = str(pair.keys()[0]) + ':', str(pair.values()[0]) + '\n'
                 fp.write(line[0] + line[1])
             else: 
                 if ':' in pair.keys()[0]:
-                    return -1
+                    retval = False; err_str = 'Invalid User ', pair.key()[0]
+                    break
                 line = str(pair.keys()[0]) + ':', str(pair.values()[0]) + '\n'
                 fp.write(line[0] + line[1])
                 break
@@ -447,10 +472,11 @@ def process_vmq_config(rbody):
         fp.close()
         ##vne:: take backup of vmq_pwd_file before replacing it
         #print 'pwd file', vmq_tmp_pwd_file
-        subprocess.call(["vmq-passwd", "-U", vmq_tmp_pwd_file])
-        subprocess.call(["mv", vmq_tmp_pwd_file, vmq_pwd_file])
+        if retval is not False: 
+            subprocess.call(["vmq-passwd", "-U", vmq_tmp_pwd_file])
+            subprocess.call(["mv", vmq_tmp_pwd_file, vmq_pwd_file])
         
-    return retval
+    return {"success" : retval, "error" : err_str }
             
          
     
