@@ -6,18 +6,23 @@ Config file handling
 import json
 import re
 
+import applog
+
 
 g_config = {}
 
 
 def init_appconfig(json_file):
     global g_config
+    #initialize logger module 
     g_config.update(get_json_config(json_file))
+    g_config['logger'] = applog.init_applog(g_config['log_file'],g_config['log_level'])
     if get_app_module() == 'web':
         load_nginx_params()
     g_config['tmp_path'] = 'tmp/'
     print 'Config loaded'
     print g_config
+    g_config['logger'].info("Config: %s", g_config)
     return 
     
 
@@ -113,3 +118,11 @@ def get_tmp_path():
 def get_vmq_rest_port():
     global g_config
     return g_config['vmq_rest_port']
+
+def get_log_file():
+    global g_config
+    return g_config['log_file']
+
+def get_app_logger():
+    global g_config
+    return g_config['logger']

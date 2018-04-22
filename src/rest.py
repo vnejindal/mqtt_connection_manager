@@ -1,17 +1,17 @@
 """
 Rest API interface file 
 
-vne::tbd:: persist appconfig information in file as well 
-vne::tbd:: rbody can be empty and any of json attr may not be present
-           rbody may not be of type application/json
+vne::tbd:: persist appconfig information in file as well - done
+vne::tbd:: rbody can be empty and any of json attr may not be present - done
+           rbody may not be of type application/json - done
            fopen failure handling
 
-           send json body in response for both success and failure
+           send json body in response for both success and failure - done
            take backup of config files & cert files before and rollback in case of failure 
 
-           log all incoming requests with json contents with timestamp
+           log all incoming requests with json contents with timestamp - done
            add versioning in this module 
-           #vne::tbd:: create a backup of nginx config file before P1
+           #vne::tbd:: create a backup of nginx config file before 
 """
 
 import fileinput
@@ -44,6 +44,7 @@ def start_rest_mod():
     """
     global g_rest_fd
     print 'Starting REST module'
+    appconfig.get_app_logger().info('Starting REST interface, %s:%s', appconfig.get_host_ip(), appconfig.get_rest_port())
     run(g_rest_fd, host=appconfig.get_host_ip(), port=appconfig.get_rest_port())
     
 #################### NGINX WEB SERVER MODULE ##########################
@@ -66,12 +67,10 @@ APIs:
     "user_auth_list":
     [
         {
-            username:"user1",
-            password:"pass1",
+            "user1":"pass1"
         },
         {
-            username:"user2",
-            password:"pass2",
+            "user2":"pass2"
         }
     ]
 }
@@ -87,32 +86,34 @@ def get_connection_config():
     print 'GET received'
     try: 
         if appconfig.get_app_module() != 'web':
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" }   
         
         return { "success" : True, "error" : "None" }
     except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
 
 @g_rest_fd.route('/api/v1/connection/mqtt', method='POST')
 def create_connection_config():
     """
-    create MQTT connection if it already does not exist
-    If it exists already, return error
-    vne:: tbd:: which error
-         tbd:: module name handling in all CRUD URLs
+    create MQTT connection
     """
     try:         
         if appconfig.get_app_module() != 'web':
             print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" }
     
         #Extract JSON payload 
         rbody = json.load(request.body)
+        appconfig.get_app_logger().info('POST received, %s:%s', request, rbody)
         print 'POST received', request, rbody  
     
         return process_connection_config(rbody)
     except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
 
@@ -125,15 +126,18 @@ def update_connection_config():
     
     if appconfig.get_app_module() != 'web':
         print 'Invalid Module'
+        appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request" } 
     
     try:
         #Extract JSON payload 
         rbody = json.load(request.body)
         print 'PUT received', request, rbody  
+        appconfig.get_app_logger().info('PUT received, %s:%s', request, rbody)
     
         return process_connection_config(rbody)   
     except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
 
@@ -148,11 +152,13 @@ def delete_connection_config():
     try: 
         if appconfig.get_app_module() != 'web':
             print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" } 
     
-        #Stop nginx server
+        #vne::tbd:: Stop nginx server
         return { "success" : True, "error" : "None" }
-    except: 
+    except:
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url) 
         return { "success" : False, "error" : "Invalid Request. Some Exception" }    
     
 
@@ -166,12 +172,13 @@ def process_connection_config(rbody):
     err_str = 'None'
     #validate secret token 
     if appconfig.get_auth_token() != rbody['auth_token']: 
+        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_auth_token())
         print 'Request Unauthorized', rbody['auth_token'], appconfig.get_auth_token()
         return { "success" : False, "error" : "Request Unauthorized" }
     
     nginx_file = appconfig.get_nginx_config()
     
-    print 'in process_connection_config', nginx_file
+    #print 'in process_connection_config', nginx_file
 
     #print rbody
     #vne::tbd:: failure of nginx_file opening here
@@ -247,7 +254,8 @@ def process_connection_config(rbody):
             subprocess.call(["mv", client_cert_tmp_file, client_cert_file])
             
     elif rbody['tls_enabled'] == '0':
-        print 'TLS disabled, doing nothing..'
+        #print 'TLS disabled, doing nothing..'
+        pass
     else: 
         retval = False; err_str = 'tls_enabled ' + rbody['tls_enabled'] 
     
@@ -321,10 +329,13 @@ def process_nginx_vmq_req(rbody):
     body['auth_token'] = vmq_auth_token
     body['user_auth_enabled'] = rbody['user_auth_enabled']
     body['user_auth_list'] = rbody['user_auth_list']
+    json_body = json.dumps(body)
     
-    req = urllib2.Request(url, json.dumps(body), headers={'Content-type': 'application/json', 'Accept': 'application/json'})
+    appconfig.get_app_logger().info('Sending REST API to vmq, %s, %s', url, json_body)
+    
+    req = urllib2.Request(url, json_body, headers={'Content-type': 'application/json', 'Accept': 'application/json'})
     response = urllib2.urlopen(req)
-    print response.read()
+    appconfig.get_app_logger().info("Got response from vmq, %s", response.read())
     
     return { "success" : True, "error" : "None" }
     
@@ -361,10 +372,12 @@ def get_vmq_config():
     try:
         if appconfig.get_app_module() != 'mqtt':
             print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" }
         
         return { "success" : True, "error" : "None" }
     except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
     
     
@@ -376,14 +389,17 @@ def create_vmq_config():
     try:
         if appconfig.get_app_module() != 'mqtt':
             print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" } 
     
         #Extract JSON payload 
         rbody = json.load(request.body)
         print 'POST received', request, rbody  
+        appconfig.get_app_logger().info('POST received, %s:%s', request, rbody)
     
         return process_vmq_config(rbody)   
     except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
 
 def process_vmq_config(rbody):
@@ -395,6 +411,7 @@ def process_vmq_config(rbody):
     #validate secret token 
     if appconfig.get_vmq_auth_token() != rbody['auth_token']: 
         print 'Request Unauthorized', rbody['auth_token'], appconfig.get_vmq_auth_token()
+        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_vmq_auth_token())
         return { "success" : False, "error" : "Request Unauthorized" }
     
     vmq_config_file = '/etc/vernemq/vernemq.conf'

@@ -31,9 +31,7 @@ def main():
         sys.exit(1)   
     
     config_file = 'config.json'
-
     init_config(config_file, sys.argv[1])
-    
     rest.start_rest_mod()
 
     
