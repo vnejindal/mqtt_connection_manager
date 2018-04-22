@@ -7,19 +7,5 @@
    "vmq_rest_port":8765,
    "log_file":"cm.log",
    "log_level":"DEBUG",
-   "nginx_file":"/etc/nginx/stream_conf.d/stream.conf",
-   "num_mqtt_brokers":1,
-   "mqtt_brokers":
-   [
-  		{
-  			"mqtt_ip":"127.0.0.1",
-  			"ssh_user":"ubuntu",
-  			"ssh_key":"access.pem"
-  		},
-  		{
-  			"mqtt_ip":"127.0.0.1",
-  			"ssh_user":"ubuntu",
-  			"ssh_key":"access.pem"
-  		}
-   ]
+   "nginx_file":"/etc/nginx/stream_conf.d/stream.conf"
 }
