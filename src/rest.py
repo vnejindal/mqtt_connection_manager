@@ -4,14 +4,13 @@ Rest API interface file
 vne::tbd:: persist appconfig information in file as well - done
 vne::tbd:: rbody can be empty and any of json attr may not be present - done
            rbody may not be of type application/json - done
-           fopen failure handling
-
+          
            send json body in response for both success and failure - done
-           take backup of config files & cert files before and rollback in case of failure 
-
            log all incoming requests with json contents with timestamp - done
            add versioning in this module 
-           #vne::tbd:: create a backup of nginx config file before 
+           create a backup of nginx config file before - done
+           create backup of existing certificates and parse nginx command output to 
+              replace them back if it fails to load new certs
 """
 
 import fileinput
@@ -89,7 +88,7 @@ def get_connection_config():
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" }   
         
-        return { "success" : True, "error" : "None" }
+        return { "success" : False, "error" : "Not Implemented" }
     except: 
         appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
@@ -154,9 +153,9 @@ def delete_connection_config():
             print 'Invalid Module'
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" } 
-    
-        #vne::tbd:: Stop nginx server
-        return { "success" : True, "error" : "None" }
+        
+        #vne:: tbd: Stop Nginx server
+        return { "success" : False, "error" : "Not Implemented" }
     except:
         appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url) 
         return { "success" : False, "error" : "Invalid Request. Some Exception" }    
@@ -164,7 +163,7 @@ def delete_connection_config():
 
 def process_connection_config(rbody):
     """
-    vne::tbd:: 1. take a backup of all modified files and revert back in case of any failure
+     1. take a backup of all modified files and revert back in case of any failure
                2. ensure proper retval at any failure 
     """
     
@@ -177,12 +176,16 @@ def process_connection_config(rbody):
         return { "success" : False, "error" : "Request Unauthorized" }
     
     nginx_file = appconfig.get_nginx_config()
+    nginx_tmp_file = appconfig.get_tmp_path() + nginx_file.split('/')[-1]
+
+    appconfig.get_app_logger().debug('copying %s %s', nginx_file, nginx_tmp_file)
+    subprocess.call(["cp", nginx_file, nginx_tmp_file])
     
     #print 'in process_connection_config', nginx_file
 
     #print rbody
-    #vne::tbd:: failure of nginx_file opening here
-    #vne::tbd:: create a backup of nginx config file before
+    #failure of nginx_file opening here
+    #create a backup of nginx config file before
     for line in fileinput.FileInput(nginx_file,inplace=1):
 
         # if TCP is enabled, update TCP Port    
@@ -219,9 +222,10 @@ def process_connection_config(rbody):
         print line.rstrip()
     
     if retval is False: 
-        pass
-        #vne::tbd:: overwrite original file and return from here only 
-    
+        #overwrite original file and return from here only 
+        subprocess.call(["cp", nginx_tmp_file, nginx_file] )
+        return {"success" : retval, "error" : err_str }
+        
     srv_cert_file = appconfig.get_server_cert_file() 
     srv_cert_key_file = appconfig.get_server_cert_key_file()
     client_cert_file = appconfig.get_client_cert_file()
@@ -243,15 +247,18 @@ def process_connection_config(rbody):
         
         process_sslcerts_nginx(srv_cert_tmp_file)
         process_sslcerts_nginx(srv_cert_key_tmp_file)
-        subprocess.call(["mv", srv_cert_tmp_file, srv_cert_file])
-        subprocess.call(["mv", srv_cert_key_tmp_file, srv_cert_key_file])
+
+        appconfig.get_app_logger().debug('copying %s %s', srv_cert_tmp_file, srv_cert_file)
+        appconfig.get_app_logger().debug('copying %s %s', srv_cert_key_tmp_file, srv_cert_key_file)
+        subprocess.call(["cp", srv_cert_tmp_file, srv_cert_file])
+        subprocess.call(["cp", srv_cert_key_tmp_file, srv_cert_key_file])
         
         if rbody['client_auth_enabled'] == '1':
             file_fp = open(client_cert_tmp_file,"w")
             file_fp.write(rbody['client_ca_cert'])
             file_fp.close()
             process_sslcerts_nginx(client_cert_tmp_file)
-            subprocess.call(["mv", client_cert_tmp_file, client_cert_file])
+            subprocess.call(["cp", client_cert_tmp_file, client_cert_file])
             
     elif rbody['tls_enabled'] == '0':
         #print 'TLS disabled, doing nothing..'
@@ -316,7 +323,7 @@ def process_sslcerts_nginx(filename):
 def process_nginx_vmq_req(rbody):
     """
     This function will send HTTP POST request to vmq node for user auth handling
-    vne:: add success: False failure scenarios here
+    
     """
     
     vmq_port = appconfig.get_vmq_rest_port()
@@ -375,7 +382,7 @@ def get_vmq_config():
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" }
         
-        return { "success" : True, "error" : "None" }
+        return { "success" : False, "error" : "Not Implemented" }
     except: 
         appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
@@ -415,6 +422,9 @@ def process_vmq_config(rbody):
         return { "success" : False, "error" : "Request Unauthorized" }
     
     vmq_config_file = '/etc/vernemq/vernemq.conf'
+    vmq_config_tmp_file = appconfig.get_tmp_path() + vmq_config_file.split('/')[-1]
+    subprocess.call(["cp", vmq_config_file, vmq_config_tmp_file] )
+    
     vmq_pwd_file = ''
     vmq_tmp_pwd_file = appconfig.get_tmp_path()
     
@@ -452,6 +462,10 @@ def process_vmq_config(rbody):
     else:
         retval = False; err_str = 'user_auth_enabled', rbody['user_auth_enabled']
     
+    if retval is False: 
+        #overwrite original file and return from here only 
+        subprocess.call(["cp", vmq_config_tmp_file, vmq_config_file])
+        return {"success" : retval, "error" : err_str }
     
     if rbody['user_auth_enabled'] == '1':
     

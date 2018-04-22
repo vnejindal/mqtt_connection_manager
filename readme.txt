@@ -2,13 +2,14 @@ This entity will run on Nginx and MQTT Broker (verneMQ) broker instances
 
 -- Run commands 
 
-Usage: python main.py <web|mqtt>
+Usage: ./start_cm.sh <web|mqtt>
+       ./stop_cm.sh
 
 On Nginx instance: 
-   $ sudo python main.py web 
+   $ ./start_cm.sh web 
 
 On verneMQ instance: 
-   $ sudo python main.py mqtt
+   $ ./start_cm.sh mqtt
 
 
 -- Config File
@@ -23,6 +24,5 @@ On verneMQ instance:
 
 -- Assumptions:
    1. Only setup having single nginx and single vmq servers is supported so far
-   2. Each process must be run with root (sudo) priviledges. 
 
 
