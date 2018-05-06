@@ -27,7 +27,7 @@ def main():
     
     global g_config
     if len (sys.argv) != 2:
-        print "Usage: python main.py <web|mqtt>"
+        print "Usage: python main.py <web|mqtt|kconnect>"
         sys.exit(1)   
     
     config_file = 'config.json'

@@ -82,7 +82,7 @@ def get_connection_config():
     """
     read MQTT current appconfig and send in HTTP response 
     """
-    print 'GET received'
+    #print 'GET received'
     try: 
         if appconfig.get_app_module() != 'web':
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
@@ -101,14 +101,14 @@ def create_connection_config():
     """
     try:         
         if appconfig.get_app_module() != 'web':
-            print 'Invalid Module'
+            #print 'Invalid Module'
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" }
     
         #Extract JSON payload 
         rbody = json.load(request.body)
         appconfig.get_app_logger().info('POST received, %s:%s', request, rbody)
-        print 'POST received', request, rbody  
+        #print 'POST received', request, rbody  
     
         return process_connection_config(rbody)
     except: 
@@ -124,14 +124,14 @@ def update_connection_config():
     """
     
     if appconfig.get_app_module() != 'web':
-        print 'Invalid Module'
+        #print 'Invalid Module'
         appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request" } 
     
     try:
         #Extract JSON payload 
         rbody = json.load(request.body)
-        print 'PUT received', request, rbody  
+        #print 'PUT received', request, rbody  
         appconfig.get_app_logger().info('PUT received, %s:%s', request, rbody)
     
         return process_connection_config(rbody)   
@@ -147,10 +147,10 @@ def delete_connection_config():
     If it doesn't, return error 
     turn OFF the Nginx as well
     """
-    print 'DELETE received'
+    #print 'DELETE received'
     try: 
         if appconfig.get_app_module() != 'web':
-            print 'Invalid Module'
+            #print 'Invalid Module'
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" } 
         
@@ -170,9 +170,9 @@ def process_connection_config(rbody):
     retval = True
     err_str = 'None'
     #validate secret token 
-    if appconfig.get_auth_token() != rbody['auth_token']: 
-        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_auth_token())
-        print 'Request Unauthorized', rbody['auth_token'], appconfig.get_auth_token()
+    if appconfig.get_mqtt_auth_token() != rbody['auth_token']: 
+        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_mqtt_auth_token())
+        #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_mqtt_auth_token()
         return { "success" : False, "error" : "Request Unauthorized" }
     
     nginx_file = appconfig.get_nginx_config()
@@ -374,11 +374,11 @@ def get_vmq_config():
     """
 
     """
-    print 'GET received'
+    #print 'GET received'
     
     try:
         if appconfig.get_app_module() != 'mqtt':
-            print 'Invalid Module'
+            #print 'Invalid Module'
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" }
         
@@ -395,13 +395,13 @@ def create_vmq_config():
     """
     try:
         if appconfig.get_app_module() != 'mqtt':
-            print 'Invalid Module'
+            #print 'Invalid Module'
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" } 
     
         #Extract JSON payload 
         rbody = json.load(request.body)
-        print 'POST received', request, rbody  
+        #print 'POST received', request, rbody  
         appconfig.get_app_logger().info('POST received, %s:%s', request, rbody)
     
         return process_vmq_config(rbody)   
@@ -417,7 +417,7 @@ def process_vmq_config(rbody):
     err_str = 'None'
     #validate secret token 
     if appconfig.get_vmq_auth_token() != rbody['auth_token']: 
-        print 'Request Unauthorized', rbody['auth_token'], appconfig.get_vmq_auth_token()
+        #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_vmq_auth_token()
         appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_vmq_auth_token())
         return { "success" : False, "error" : "Request Unauthorized" }
     
@@ -509,5 +509,206 @@ def process_vmq_config(rbody):
         
     return {"success" : retval, "error" : err_str }
             
-         
+
+#################### KAFKA CONNECT SERVER MODULE ##########################      
+"""
+{
+ "name" : "test-1",
+ "config" : {
+     "connector.class": "com.incs83.kafka.connect.mqtt.MqttSourceConnector",
+     "mqtt.server_uris": "ssl://18.221.86.121:8883",
+     "tasks.max": "2",
+     "name": "test-1",
+     "kafka.topic": "TEST",
+     "mqtt.clean_session": "true",
+     "mqtt.user" : "user1",
+     "mqtt.password" : "pass1",
+     "mqtt.ssl.ca_cert" : "/var/lib/hadoop-hdfs/mqtt-tls/root.crt",
+     "mqtt.ssl.cert" : "/var/lib/hadoop-hdfs/mqtt-tls/client.crt",
+     "mqtt.ssl.key" : "/var/lib/hadoop-hdfs/mqtt-tls/client.key",
+     "mqtt.topic": "TEST_VNE_REPORT",
+     "mqtt.connection_timeout": "150000",
+     "mqtt.keep_alive_interval": "150000",
+     "mqtt.auto_reconnect": "true",
+     "offset.flush.interval.ms": "600000",
+     "offset.flush.timeout.ms": "600000",
+     "request.timeout.ms": "600000"
+ }
+}
+
+create a connector 
+delete a connector 
+get a connector config
+edit a connector 
+get list of all connectors 
+
+   API body: 
+    TCP 
+     "name": "test-1",
+     "mqtt.server_uri": "tcp://18.221.86.121:1883",
+     "mqtt.user" : "user1", #if present
+     "mqtt.password" : "pass1", #if present 
+     "mqtt.topic": "TEST_VNE_REPORT",
+
+
+    TLS 
+     "name": "test-1",
+     "mqtt.server_uri": "ssl://18.221.86.121:8883",
+     "mqtt.user" : "user1",
+     "mqtt.password" : "pass1",
+     "mqtt.ssl.ca_cert" : "/var/lib/hadoop-hdfs/mqtt-tls/root.crt",
+     "mqtt.ssl.cert" : "/var/lib/hadoop-hdfs/mqtt-tls/client.crt",
+     "mqtt.ssl.key" : "/var/lib/hadoop-hdfs/mqtt-tls/client.key",
+     "mqtt.topic": "TEST_VNE_REPORT",
+
     
+  
+"""
+
+
+
+
+@g_rest_fd.route('/api/v1/internal/kconnect', method='GET')
+def get_kconnect_config():
+    """
+    return all config of kafka connect connectors
+    """
+    try:
+        if appconfig.get_app_module() != 'kconnect':
+            #print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
+            return { "success" : False, "error" : "Invalid Request" } 
+    
+        #Extract JSON payload 
+        rbody = json.load(request.body)
+        #print 'GET received', request, rbody  
+        appconfig.get_app_logger().info('GET received, %s:%s', request, rbody)
+    
+        #vne::tbd:: return process_vmq_config(rbody)   
+    except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
+
+
+@g_rest_fd.route('/api/v1/internal/kconnect', method='POST')
+def create_kconnect_connector(): 
+    """
+    create a new kafka connect connector 
+    """
+    try:
+        if appconfig.get_app_module() != 'kconnect':
+            #print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
+            return { "success" : False, "error" : "Invalid Request" } 
+    
+        #Extract JSON payload 
+        rbody = json.load(request.body)
+        #print 'POST received', request, rbody  
+        appconfig.get_app_logger().info('POST received, %s:%s', request, rbody)
+    
+        return process_create_kconnect(rbody)   
+    except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
+
+
+@g_rest_fd.route('/api/v1/internal/kconnect', method='DELETE')
+def delete_kconnect_connector(): 
+    """
+    delete kafka connect connector 
+    """
+    try:
+        if appconfig.get_app_module() != 'kconnect':
+            #print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
+            return { "success" : False, "error" : "Invalid Request" } 
+    
+        #Extract JSON payload 
+        rbody = json.load(request.body)
+        #print 'POST received', request, rbody  
+        appconfig.get_app_logger().info('DELETE received, %s:%s', request, rbody)
+    
+        #vne::tbd return process_vmq_config(rbody)   
+    except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
+
+
+def process_create_kconnect(rbody):
+    """
+    
+    check if a connector already exists, return false 
+    
+    
+    
+    """
+    retval = True
+    err_str = 'None'
+    #validate secret token 
+    if appconfig.get_kconnect_auth_token() != rbody['auth_token']: 
+        #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_kconnect_auth_token()
+        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_kconnect_auth_token())
+        return { "success" : False, "error" : "Request Unauthorized" }
+    
+    ## Application Logic 
+    
+    if rbody['name'] in appconfig.get_kconnect_config().keys():
+        appconfig.get_app_logger().error('Connector already exists, %s', rbody['name'])
+        return { "success" : False, "error" : "Connector already exists" }
+    else: 
+        
+        # prepare body for KC
+        payload = ''
+        retval, err_str = send_kconnect_kc_req(payload)
+        #vne::tbd:: process request, update g_config
+        # create new connector file and dump file there, if success from send_kconnect_kc_req
+        if retval == 'success':
+            appconfig.update_kconnect_config(payload['name'], payload)
+    
+    return {"success" : retval, "error" : err_str }
+
+def send_kconnect_kc_req(rbody, rmethod = 'POST'):
+    """
+    This function will send HTTP POST request to vmq node for user auth handling
+    
+    """
+    
+    #vne::tbd:: handling of other methods - DELETE, GET
+    url = 'http://' + appconfig.get_kconnect_kc_url() + '/connectors'
+    
+    body = {}
+    body['name'] = rbody['name']
+    body['config'] = {}
+    body['config']['connector.class'] = 'com.evokly.kafka.connect.mqtt.MqttSourceConnector'
+    body['config']['tasks.max'] = '2'
+    body['config']['kafka.topic'] = appconfig.get_kconnect_kafka_topic()
+    body['config']['mqtt.clean_session'] = 'true'
+    body['config']['mqtt.connection_timeout'] = '150000'
+    body['config']['mqtt.keep_alive_interval'] = '150000'
+    body['config']['mqtt.auto_reconnect'] = 'true'
+    body['config']['offset.flush.interval.ms'] = '60000'
+    body['config']['offset.flush.timeout.ms'] = '60000'
+    body['config']['request.timeout.ms'] = '50000'
+    
+    body['config']['name'] = rbody['name']
+    body['config']['mqtt.server_uris'] = rbody['mqtt.server_uri']
+    body['config']['mqtt.topic'] = rbody['mqtt.topic']  
+    if 'mqtt.user' in rbody.keys() and 'mqtt.password' in rbody.keys():
+        body['config']['mqtt.user'] = rbody['mqtt.user']
+        body['config']['mqtt.password'] = rbody['mqtt.password']
+    
+    #vne::tbd:: TLS Support 
+   
+    json_body = json.dumps(body)
+    
+    appconfig.get_app_logger().info('Sending REST API to kakfa-connect, %s, %s', url, json_body)
+    
+    req = urllib2.Request(url, json_body, headers={'Content-type': 'application/json', 'Accept': 'application/json'})
+    req.get_method = lambda: rmethod
+    response = urllib2.urlopen(req)
+    appconfig.get_app_logger().info("Got response from kafka-connect, %s", response.read())
+    
+    #vne::tbd check if response is 200 OK with error_code not present
+    return { "success" : True, "error" : "None" }
+    
+

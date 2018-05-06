@@ -2,10 +2,12 @@
    "_comment":"Configuration File for MQTT CONNECTION MANAGER",
    "host_ip":"172.31.15.174",
    "rest_port_num":8765,
-   "auth_token":"secret",
+   "auth_token_mqtt":"secret",
+   "auth_token_kconnect":"secret2",
    "auth_token_vmq":"secret1",
    "vmq_rest_port":8765,
    "log_file":"cm.log",
    "log_level":"DEBUG",
-   "nginx_file":"/etc/nginx/stream_conf.d/stream.conf"
+   "nginx_file":"/etc/nginx/stream_conf.d/stream.conf",
+   "kconnect_kafka_topic":"TEST"
 }
