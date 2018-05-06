@@ -693,6 +693,7 @@ def process_create_kconnect(rbody):
                 rbody[rbody_key] = cert_file
         
         retval, err_str = send_kconnect_kc_req(rbody, 'POST')
+        print retval , err_str
         # create new connector file and dump file there, if success from send_kconnect_kc_req
         if retval == 'success':
             appconfig.update_kconnect_config(rbody['name'], rbody, 'CREATE')
@@ -712,7 +713,7 @@ def send_kconnect_kc_req(rbody, rmethod = 'POST'):
   
     if rmethod == 'DELETE':
         url = url + '/' + rbody['name']    
-    elif rmethod == 'CREATE':
+    elif rmethod == 'POST':
         body['name'] = rbody['name']
         body['config'] = {}
         body['config']['connector.class'] = 'com.evokly.kafka.connect.mqtt.MqttSourceConnector'
