@@ -44,8 +44,13 @@ def init_kconnect_config():
     if not os.path.exists(cpath):
         os.makedirs(cpath) 
     
+    certpath = g_config['tmp_path'] + 'certs/'
+    if not os.path.exists(certpath):
+        os.makedirs(certpath) 
+        
     g_config['kconnect_path'] = cpath
-    # KC REST URL ; Hardcoding it as it will sit on same machine
+    g_config['kconnect_cert_path'] = certpath
+    # KC REST URL ; Hardcoding it as it will run on same machine
     g_config['kconnect_kc_url'] = '127.0.0.1:8083'
     g_config['kconnect_config'] = {}
     
@@ -78,9 +83,6 @@ def load_nginx_params():
         sobj = re.search(r'server\b( *)(.*):(.*)', line, re.M|re.I)
         if sobj:
             g_config['upstream_mqtt_server'] = sobj.group(2)
-        #vne:: tbd:: add support for multiple vermq servers     
-    
-           
     nginx_fp.close()
     return 
  
@@ -165,6 +167,10 @@ def get_kconnect_path():
     global g_config
     return g_config['kconnect_path']
 
+def get_kconnect_cert_path():
+    global g_config
+    return g_config['kconnect_cert_path']
+
 def get_kconnect_config():
     global g_config
     return g_config['kconnect_config']
@@ -177,13 +183,16 @@ def get_kconnect_kafka_topic():
     global g_config
     return g_config['kconnect_kafka_topic']
 
-def update_kconnect_config(name, kconfig):
+def update_kconnect_config(name, kconfig, action = 'CREATE'):
     global g_config
     
-    g_config['kconnect_config'][name] = kconfig
-    
-    fname = get_kconnect_path() + name    
-    fp = open(fname, 'w')
-    fp.write(json.dumps(kconfig))
-    fp.close()
+    if action == 'CREATE':
+        g_config['kconnect_config'][name] = kconfig
+        fp = open(get_kconnect_path() + name, 'w')
+        fp.write(json.dumps(kconfig))
+        fp.close()
+    elif action == 'DELETE':
+        os.remove(get_kconnect_path() + name)
+        del get_kconnect_config()[name]
+        
     

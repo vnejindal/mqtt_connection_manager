@@ -572,6 +572,7 @@ get list of all connectors
 def get_kconnect_config():
     """
     return all config of kafka connect connectors
+    vne::tbd:: validate auth token
     """
     try:
         if appconfig.get_app_module() != 'kconnect':
@@ -579,12 +580,10 @@ def get_kconnect_config():
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" } 
     
-        #Extract JSON payload 
-        rbody = json.load(request.body)
         #print 'GET received', request, rbody  
-        appconfig.get_app_logger().info('GET received, %s:%s', request, rbody)
+        appconfig.get_app_logger().info('GET received, %s', request)
     
-        #vne::tbd:: return process_vmq_config(rbody)   
+        return { "success" : True, "config": json.dumps(appconfig.get_kconnect_config()) }   
     except: 
         appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
@@ -628,18 +627,43 @@ def delete_kconnect_connector():
         #print 'POST received', request, rbody  
         appconfig.get_app_logger().info('DELETE received, %s:%s', request, rbody)
     
-        #vne::tbd return process_vmq_config(rbody)   
+        return process_delete_kconnect(rbody)   
     except: 
         appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
 
+def process_delete_kconnect(rbody):
+    """
+    
+    """
+    retval = True
+    err_str = 'None'
+    #validate secret token 
+    if appconfig.get_kconnect_auth_token() != rbody['auth_token']: 
+        #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_kconnect_auth_token()
+        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_kconnect_auth_token())
+        return { "success" : False, "error" : "Request Unauthorized" }
+    
+    ## Application Logic 
+    
+    if rbody['name'] not in appconfig.get_kconnect_config().keys():
+        appconfig.get_app_logger().error('Connector does not exist, %s', rbody['name'])
+        return { "success" : False, "error" : "Connector does not exist" }
+    else: 
+        # Send Delete request to KC 
+        retval, err_str = send_kconnect_kc_req(rbody, 'DELETE')
+        # create new connector file and dump file there, if success from send_kconnect_kc_req
+        if retval == 'success':
+            appconfig.update_kconnect_config(rbody['name'], rbody, 'DELETE')
+        else: 
+            pass #vne::tbd:: remove cert files if created
+    
+    return {"success" : retval, "error" : err_str }
+
+
 
 def process_create_kconnect(rbody):
     """
-    
-    check if a connector already exists, return false 
-    
-    
     
     """
     retval = True
@@ -656,11 +680,24 @@ def process_create_kconnect(rbody):
         appconfig.get_app_logger().error('Connector already exists, %s', rbody['name'])
         return { "success" : False, "error" : "Connector already exists" }
     else: 
-        retval, err_str = send_kconnect_kc_req(rbody)
-        #vne::tbd:: process request, update g_config
+        rbody_keyl = ['mqtt.ssl.ca_cert', 'mqtt.ssl.cert', 'mqtt.ssl.key']
+        
+        #TLS Support 
+        for rbody_key in rbody_keyl:
+            if rbody_key in rbody.keys():
+                cert_file = appconfig.get_kconnect_cert_path() + rbody_key
+                file_fp = open(cert_file,"w")
+                file_fp.write(rbody[rbody_key])
+                file_fp.close()
+                process_sslcerts_nginx(cert_file)
+                rbody[rbody_key] = cert_file
+        
+        retval, err_str = send_kconnect_kc_req(rbody, 'POST')
         # create new connector file and dump file there, if success from send_kconnect_kc_req
         if retval == 'success':
-            appconfig.update_kconnect_config(rbody['name'], rbody)
+            appconfig.update_kconnect_config(rbody['name'], rbody, 'CREATE')
+        else: 
+            pass #vne::tbd:: remove cert files if created
     
     return {"success" : retval, "error" : err_str }
 
@@ -669,43 +706,50 @@ def send_kconnect_kc_req(rbody, rmethod = 'POST'):
     This function will send HTTP POST request to vmq node for user auth handling
     
     """
-    
-    #vne::tbd:: handling of other methods - DELETE, GET
+    body = {}
     url = 'http://' + appconfig.get_kconnect_kc_url() + '/connectors'
     
-    body = {}
-    body['name'] = rbody['name']
-    body['config'] = {}
-    body['config']['connector.class'] = 'com.evokly.kafka.connect.mqtt.MqttSourceConnector'
-    body['config']['tasks.max'] = '2'
-    body['config']['kafka.topic'] = appconfig.get_kconnect_kafka_topic()
-    body['config']['mqtt.clean_session'] = 'true'
-    body['config']['mqtt.connection_timeout'] = '150000'
-    body['config']['mqtt.keep_alive_interval'] = '150000'
-    body['config']['mqtt.auto_reconnect'] = 'true'
-    body['config']['offset.flush.interval.ms'] = '60000'
-    body['config']['offset.flush.timeout.ms'] = '60000'
-    body['config']['request.timeout.ms'] = '50000'
+  
+    if rmethod == 'DELETE':
+        url = url + '/' + rbody['name']    
+    elif rmethod == 'CREATE':
+        body['name'] = rbody['name']
+        body['config'] = {}
+        body['config']['connector.class'] = 'com.evokly.kafka.connect.mqtt.MqttSourceConnector'
+        body['config']['tasks.max'] = '2'
+        body['config']['kafka.topic'] = appconfig.get_kconnect_kafka_topic()
+        body['config']['mqtt.clean_session'] = 'true'
+        body['config']['mqtt.connection_timeout'] = '150000'
+        body['config']['mqtt.keep_alive_interval'] = '150000'
+        body['config']['mqtt.auto_reconnect'] = 'true'
+        body['config']['offset.flush.interval.ms'] = '60000'
+        body['config']['offset.flush.timeout.ms'] = '60000'
+        body['config']['request.timeout.ms'] = '50000'
+        
+        body['config']['name'] = rbody['name']
+        body['config']['mqtt.server_uris'] = rbody['mqtt.server_uri']
+        body['config']['mqtt.topic'] = rbody['mqtt.topic']  
+        if 'mqtt.user' in rbody.keys() and 'mqtt.password' in rbody.keys():
+            body['config']['mqtt.user'] = rbody['mqtt.user']
+            body['config']['mqtt.password'] = rbody['mqtt.password']
+        
+        rbody_keyl = ['mqtt.ssl.ca_cert', 'mqtt.ssl.cert', 'mqtt.ssl.key']
+        
+        for rbody_key in rbody_keyl:
+            if rbody_key in rbody.keys():
+                body['config'][rbody_key] = rbody[rbody_key]
+            
     
-    body['config']['name'] = rbody['name']
-    body['config']['mqtt.server_uris'] = rbody['mqtt.server_uri']
-    body['config']['mqtt.topic'] = rbody['mqtt.topic']  
-    if 'mqtt.user' in rbody.keys() and 'mqtt.password' in rbody.keys():
-        body['config']['mqtt.user'] = rbody['mqtt.user']
-        body['config']['mqtt.password'] = rbody['mqtt.password']
     
-    #vne::tbd:: TLS Support 
-   
     json_body = json.dumps(body)
-    
     appconfig.get_app_logger().info('Sending REST API to kakfa-connect, %s %s, %s', rmethod, url, json_body)
     
-    req = urllib2.Request(url, json_body, headers={'Content-type': 'application/json', 'Accept': 'application/json'})
+    req = urllib2.Request(url, data = json_body, headers={'Content-type': 'application/json', 'Accept': 'application/json'})
     req.get_method = lambda: rmethod
     response = urllib2.urlopen(req)
     appconfig.get_app_logger().info("Got response from kafka-connect, %s", response.read())
     
-    #vne::tbd check if response is 200 OK with error_code not present
+    #vne::tbd check if response is 200 OK with error_code not present; fallback 
     return { "success" : True, "error" : "None" }
     
 

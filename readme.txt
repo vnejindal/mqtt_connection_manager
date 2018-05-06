@@ -46,7 +46,7 @@ HTTP POST/PUT: <ip>:<rest_port_num>/api/v1/connection/mqtt
     "server_cert_key":"-----BEGIN PRIVATE KEY-----+PrMq2g==-----END PRIVATE KEY-----",
     "server_cert":"-----BEGIN CERTIFICATE-----MIIFMjCCBBqgAWeCtWVYpoNz4iCxTIM5CufReYNnyicsbkqWletNw+vHX/bvZ8=-----END CERTIFICATE-----",
     "client_auth_enabled":"1",
-    "client_ca_cert": "ABCDER1234",
+    "client_ca_cert": "-----BEGIN CERTIFICATE-----MIIFMjCCBBqgAWeCtWVYpoNz4iCxTIM5CufReYNnyicsbkqWletNw+vHX/bvZ8=-----END CERTIFICATE-----",
     "user_auth_enabled":"1",
     "user_auth_list":
     [
@@ -76,7 +76,9 @@ HTTP POST: <ip addr>:<vmq_rest_port>/api/v1/internal/vmq
 	APIs - KCONNECT
 =========================
 
-HTTP POST/DELETE: <ip addr>:<rest_port_num>/api/v1/internal/kconnect
+HTTP GET/POST/DELETE: <ip addr>:<rest_port_num>/api/v1/internal/kconnect
+
+In case of DELETE, only auth_token and name are required in payload
 
 {
     "auth_token":<auth_token_kconnect>,
@@ -84,6 +86,9 @@ HTTP POST/DELETE: <ip addr>:<rest_port_num>/api/v1/internal/kconnect
      "mqtt.server_uri": "tcp://18.221.86.121:1883",
      "mqtt.user" : "user1",
      "mqtt.password" : "pass1", 
-     "mqtt.topic": "TEST_VNE_REPORT"
+     "mqtt.topic": "TEST_VNE_REPORT",
+     "mqtt.ssl.ca_cert" : "-----BEGIN CERTIFICATE-----MIIFMjCCBBqgAWeCtWVYpoNz4iCxTIM5CufReYNnyicsbkqWletNw+vHX/bvZ8=-----END CERTIFICATE-----",
+     "mqtt.ssl.cert" : "-----BEGIN CERTIFICATE-----MIIFMjCCBBqgAWeCtWVYpoNz4iCxTIM5CufReYNnyicsbkqWletNw+vHX/bvZ8=-----END CERTIFICATE-----",
+     "mqtt.ssl.key" : "-----BEGIN PRIVATE KEY-----+PrMq2g==-----END PRIVATE KEY-----"
 }
 
