@@ -656,14 +656,11 @@ def process_create_kconnect(rbody):
         appconfig.get_app_logger().error('Connector already exists, %s', rbody['name'])
         return { "success" : False, "error" : "Connector already exists" }
     else: 
-        
-        # prepare body for KC
-        payload = ''
-        retval, err_str = send_kconnect_kc_req(payload)
+        retval, err_str = send_kconnect_kc_req(rbody)
         #vne::tbd:: process request, update g_config
         # create new connector file and dump file there, if success from send_kconnect_kc_req
         if retval == 'success':
-            appconfig.update_kconnect_config(payload['name'], payload)
+            appconfig.update_kconnect_config(rbody['name'], rbody)
     
     return {"success" : retval, "error" : err_str }
 
@@ -701,7 +698,7 @@ def send_kconnect_kc_req(rbody, rmethod = 'POST'):
    
     json_body = json.dumps(body)
     
-    appconfig.get_app_logger().info('Sending REST API to kakfa-connect, %s, %s', url, json_body)
+    appconfig.get_app_logger().info('Sending REST API to kakfa-connect, %s %s, %s', rmethod, url, json_body)
     
     req = urllib2.Request(url, json_body, headers={'Content-type': 'application/json', 'Accept': 'application/json'})
     req.get_method = lambda: rmethod
