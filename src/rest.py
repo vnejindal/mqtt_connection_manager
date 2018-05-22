@@ -26,6 +26,9 @@ from __builtin__ import False
 
 g_rest_fd = Bottle()
 
+g_ssl_kc_keys = ['mqtt.ssl.ca_cert', 'mqtt.ssl.cert', 'mqtt.ssl.key']
+
+
 
 def init_rest():
     """
@@ -611,6 +614,32 @@ def create_kconnect_connector():
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
 
 
+
+#PUT    /connectors/(string:name)/config    Creates a new connector using the given configuration or updates the configuration for an existing connector.
+
+@g_rest_fd.route('/api/v1/internal/kconnect', method='PUT')
+def update_kconnect_connector():
+    """
+    Update an existing kafka connect connector 
+    """
+    try:
+        if appconfig.get_app_module() != 'kconnect':
+            #print 'Invalid Module'
+            appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
+            return { "success" : False, "error" : "Invalid Request" } 
+    
+        #Extract JSON payload 
+        rbody = json.load(request.body)
+        #print 'PUT received', request, rbody  
+        appconfig.get_app_logger().info('PUT received, %s:%s', request, rbody)
+    
+        return process_update_kconnect(rbody)   
+    except: 
+        appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
+        return { "success" : False, "error" : "Invalid Request. Some Exception" }
+
+
+
 @g_rest_fd.route('/api/v1/internal/kconnect', method='DELETE')
 def delete_kconnect_connector(): 
     """
@@ -680,10 +709,10 @@ def process_create_kconnect(rbody):
         appconfig.get_app_logger().error('Connector already exists, %s', rbody['name'])
         return { "success" : False, "error" : "Connector already exists" }
     else: 
-        rbody_keyl = ['mqtt.ssl.ca_cert', 'mqtt.ssl.cert', 'mqtt.ssl.key']
+        global g_ssl_kc_keys
         
         #TLS Support 
-        for rbody_key in rbody_keyl:
+        for rbody_key in g_ssl_kc_keys:
             if rbody_key in rbody.keys():
                 cert_file = appconfig.get_kconnect_cert_path() + rbody_key
                 file_fp = open(cert_file,"w")
@@ -703,6 +732,51 @@ def process_create_kconnect(rbody):
     
     return {"success" : retdict['success'], "error" : retdict['error'] }
 
+def process_update_kconnect(rbody):
+    """
+    
+    """
+    retval = True
+    err_str = 'None'
+    #validate secret token 
+    if appconfig.get_kconnect_auth_token() != rbody['auth_token']: 
+        #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_kconnect_auth_token()
+        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_kconnect_auth_token())
+        return { "success" : False, "error" : "Request Unauthorized" }
+    
+    ## Application Logic 
+    
+    if rbody['name'] not in appconfig.get_kconnect_config().keys():
+        appconfig.get_app_logger().error('Connector does not exist, %s', rbody['name'])
+        return { "success" : False, "error" : "Connector does not exist" }
+    else: 
+        global g_ssl_kc_keys
+        
+        #TLS Support 
+        #vne::tbd:: take backup of original certs first and fallback in case of failure 
+        #vne::tbd:: in case of success, delete original certs 
+        
+        for rbody_key in g_ssl_kc_keys:
+            if rbody_key in rbody.keys():
+                cert_file = appconfig.get_kconnect_cert_path() + rbody_key
+                file_fp = open(cert_file,"w")
+                file_fp.write(rbody[rbody_key])
+                file_fp.close()
+                process_sslcerts_nginx(cert_file)
+                rbody[rbody_key] = cert_file
+        
+        retdict = send_kconnect_kc_req(rbody, 'PUT')
+        
+        print retdict
+        # create new connector file and dump file there, if success from send_kconnect_kc_req
+        if retdict['success'] is True:
+            appconfig.update_kconnect_config(rbody['name'], rbody, 'CREATE')
+        else: 
+            pass #vne::tbd:: remove cert files if created
+    
+    return {"success" : retdict['success'], "error" : retdict['error'] }
+
+
 def send_kconnect_kc_req(rbody, rmethod = 'POST'):
     """
     This function will send HTTP POST request to vmq node for user auth handling
@@ -711,10 +785,12 @@ def send_kconnect_kc_req(rbody, rmethod = 'POST'):
     body = {}
     url = 'http://' + appconfig.get_kconnect_kc_url() + '/connectors'
     
+    if rmethod == 'PUT':
+        url = '/'.join([url, rbody['name'], 'config'])    
   
     if rmethod == 'DELETE':
         url = url + '/' + rbody['name']    
-    elif rmethod == 'POST':
+    elif rmethod == 'POST' or rmethod == 'PUT':
         body['name'] = rbody['name']
         body['config'] = {}
         body['config']['connector.class'] = 'com.evokly.kafka.connect.mqtt.MqttSourceConnector'
@@ -735,9 +811,9 @@ def send_kconnect_kc_req(rbody, rmethod = 'POST'):
             body['config']['mqtt.user'] = rbody['mqtt.user']
             body['config']['mqtt.password'] = rbody['mqtt.password']
         
-        rbody_keyl = ['mqtt.ssl.ca_cert', 'mqtt.ssl.cert', 'mqtt.ssl.key']
+        global g_ssl_kc_keys
         
-        for rbody_key in rbody_keyl:
+        for rbody_key in g_ssl_kc_keys:
             if rbody_key in rbody.keys():
                 body['config'][rbody_key] = rbody[rbody_key]
             
