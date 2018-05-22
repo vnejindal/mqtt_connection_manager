@@ -692,15 +692,16 @@ def process_create_kconnect(rbody):
                 process_sslcerts_nginx(cert_file)
                 rbody[rbody_key] = cert_file
         
-        retval, err_str = send_kconnect_kc_req(rbody, 'POST')
-        print retval , err_str
+        retdict = send_kconnect_kc_req(rbody, 'POST')
+        
+        print retdict
         # create new connector file and dump file there, if success from send_kconnect_kc_req
-        if retval == 'success':
+        if retdict['success'] is True:
             appconfig.update_kconnect_config(rbody['name'], rbody, 'CREATE')
         else: 
             pass #vne::tbd:: remove cert files if created
     
-    return {"success" : retval, "error" : err_str }
+    return {"success" : retdict['success'], "error" : retdict['error'] }
 
 def send_kconnect_kc_req(rbody, rmethod = 'POST'):
     """
