@@ -76,7 +76,7 @@ HTTP POST: <ip addr>:<vmq_rest_port>/api/v1/internal/vmq
 	APIs - KCONNECT
 =========================
 
-HTTP GET/POST/DELETE: <ip addr>:<rest_port_num>/api/v1/internal/kconnect
+HTTP GET/POST/PUT/DELETE: <ip addr>:<rest_port_num>/api/v1/internal/kconnect
 
 In case of DELETE, only auth_token and name are required in payload
 

@@ -333,6 +333,10 @@ def process_nginx_vmq_req(rbody):
     vmq_auth_token = appconfig.get_vmq_auth_token()
     vmq_srv_ip = appconfig.get_upstream_mqtt_server()
     
+    if 'user_auth_enabled' not in rbody.keys():
+        appconfig.get_app_logger().info('user_auth_enabled not present in body.. returning')
+        return { "success" : True, "error" : "None" }
+    
     url = 'http://' + vmq_srv_ip + ':' + str(vmq_port) + '/api/v1/internal/vmq'
     
     body = {}
