@@ -60,13 +60,13 @@ def init_kconnect_config():
     g_config['kconnect_config'] = {}
     
     for filename in os.listdir(get_kconnect_path()):
-        fp = open(filename, 'r')
+        fp = open(get_kconnect_path() + filename, 'r')
         get_kconnect_config()[filename] = json.loads(fp.read())
         get_app_logger().info('loaded kconnect config for %s, %s', filename, get_kconnect_config()[filename])
         fp.close()
         
     get_app_logger().info("Starting thread for kc sync")
-    g_config['kconnect_sync_thread'] = threading.Thread(target=kconnect_sync_thread, args=(5,))
+    g_config['kconnect_sync_thread'] = threading.Thread(target=kconnect_sync_thread, args=(15,))
    
     return
 
@@ -88,10 +88,10 @@ def kconnect_sync_thread(stime):
             continue
         
         resp_json = response.read()
-        get_app_logger().info("Got response from kafka-connect, %s", resp_json)
+        get_app_logger().info("Got response from kafka-connect, %s %d", resp_json, len(resp_json))
         
         #if len(resp_json) != len(get_kconnect_config().keys()):
-        if len(resp_json) == 0:
+        if len(resp_json) == 2:
             # KC out of sync , sync it
             get_app_logger().info("kafka-connect out of sync, syncing it..")
             for key in get_kconnect_config().keys():
