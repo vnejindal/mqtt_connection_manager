@@ -6,6 +6,11 @@ Config file handling
 import json
 import re
 import os
+import threading
+from time import sleep
+import urllib2
+import rest
+
 
 import applog
 
@@ -57,9 +62,41 @@ def init_kconnect_config():
     for filename in os.listdir(get_kconnect_path()):
         fp = open(filename, 'r')
         get_kconnect_config()[filename] = json.loads(fp.read())
+        get_app_logger().info('loaded kconnect config for %s, %s', filename, get_kconnect_config()[filename])
         fp.close()
+        
+    get_app_logger().info("Starting thread for kc sync")
+    g_config['kconnect_sync_thread'] = threading.Thread(target=kconnect_sync_thread, args=(5,))
    
     return
+
+def kconnect_sync_thread(stime):
+    
+    global g_config
+
+    url = 'http://' + get_kconnect_kc_url() + '/connectors'
+    while True:
+        sleep(stime)
+        req = urllib2.Request(url)
+        req.get_method = lambda: 'GET'
+        get_app_logger().info("kconnect sync thread running %s", url)
+        #vne::tbd:: put try catch here; While loop must not exit for any reason
+        try: 
+            response = urllib2.urlopen(req)
+        except urllib2.URLError as e:
+            get_app_logger().error("error resp from kafka-connect %s", e.reason)
+            continue
+        
+        resp_json = response.read()
+        get_app_logger().info("Got response from kafka-connect, %s", resp_json)
+        
+        #if len(resp_json) != len(get_kconnect_config().keys()):
+        if len(resp_json) == 0:
+            # KC out of sync , sync it
+            get_app_logger().info("kafka-connect out of sync, syncing it..")
+            for key in get_kconnect_config().keys():
+                rest.send_kconnect_kc_req(get_kconnect_config()[key], 'POST')
+                
 
 def load_nginx_params():
     """
@@ -195,4 +232,6 @@ def update_kconnect_config(name, kconfig, action = 'CREATE'):
         os.remove(get_kconnect_path() + name)
         del get_kconnect_config()[name]
         
-    
+def get_kconnect_sync_thrid():
+    global g_config
+    return g_config['kconnect_sync_thread'] 

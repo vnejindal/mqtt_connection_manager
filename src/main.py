@@ -32,9 +32,10 @@ def main():
     
     config_file = 'config.json'
     init_config(config_file, sys.argv[1])
+    appconfig.get_kconnect_sync_thrid().start()
     rest.start_rest_mod()
-
     
+    appconfig.get_kconnect_sync_thrid().join() 
     
 if __name__ == '__main__':
     main()
