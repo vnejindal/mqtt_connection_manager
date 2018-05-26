@@ -76,9 +76,8 @@ HTTP POST: <ip addr>:<vmq_rest_port>/api/v1/internal/vmq
 	APIs - KCONNECT
 =========================
 
-HTTP GET/POST/PUT/DELETE: <ip addr>:<rest_port_num>/api/v1/internal/kconnect
+HTTP GET/POST/PUT: <ip addr>:<rest_port_num>/api/v1/internal/kconnect
 
-In case of DELETE, only auth_token and name are required in payload
 
 {
     "auth_token":<auth_token_kconnect>,
@@ -92,3 +91,7 @@ In case of DELETE, only auth_token and name are required in payload
      "mqtt.ssl.key" : "-----BEGIN PRIVATE KEY-----+PrMq2g==-----END PRIVATE KEY-----"
 }
 
+HTTP DELETE is implemented using query params due to platform java library limitation
+In case of DELETE, only auth_token and name are required in payload
+Example:     api/v1/internal/kconnect?authToken=<secret>&name=<connector name>
+      use + in case of query params

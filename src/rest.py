@@ -648,6 +648,8 @@ def update_kconnect_connector():
 def delete_kconnect_connector(): 
     """
     delete kafka connect connector 
+    api/v1/internal/kconnect?authToken=<secret>&name=<connector name>
+    use + in case of query params
     """
     try:
         if appconfig.get_app_module() != 'kconnect':
@@ -655,8 +657,12 @@ def delete_kconnect_connector():
             appconfig.get_app_logger().error('Invalid Module, %s, %s', appconfig.get_app_module(), request.url)
             return { "success" : False, "error" : "Invalid Request" } 
     
+        rbody = {}
+        rbody['auth_token'] = request.query.auth_token or 'None'
+        rbody['name'] = request.query.name or 'None'
+
         #Extract JSON payload 
-        rbody = json.load(request.body)
+#        rbody = json.load(request.body)
         #print 'POST received', request, rbody  
         appconfig.get_app_logger().info('DELETE received, %s:%s', request, rbody)
     
