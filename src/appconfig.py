@@ -79,7 +79,7 @@ def kconnect_sync_thread(stime):
         sleep(stime)
         req = urllib2.Request(url)
         req.get_method = lambda: 'GET'
-        get_app_logger().info("kconnect sync thread running %s", url)
+#        get_app_logger().info("kconnect sync thread running %s", url)
         #vne::tbd:: put try catch here; While loop must not exit for any reason
         try: 
             response = urllib2.urlopen(req)
@@ -88,12 +88,12 @@ def kconnect_sync_thread(stime):
             continue
         
         resp_json = response.read()
-        get_app_logger().info("Got response from kafka-connect, %s %d", resp_json, len(resp_json))
+#        get_app_logger().info("Got response from kafka-connect, %s %d", resp_json, len(resp_json))
         
         #if len(resp_json) != len(get_kconnect_config().keys()):
         if len(resp_json) == 2:
             # KC out of sync , sync it
-            get_app_logger().info("kafka-connect out of sync, syncing it..")
+#            get_app_logger().info("kafka-connect out of sync, syncing it..")
             for key in get_kconnect_config().keys():
                 rest.send_kconnect_kc_req(get_kconnect_config()[key], 'POST')
                 

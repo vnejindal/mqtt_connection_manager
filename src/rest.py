@@ -675,8 +675,6 @@ def process_delete_kconnect(rbody):
     """
     
     """
-    retval = True
-    err_str = 'None'
     #validate secret token 
     if appconfig.get_kconnect_auth_token() != rbody['auth_token']: 
         #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_kconnect_auth_token()
@@ -690,23 +688,20 @@ def process_delete_kconnect(rbody):
         return { "success" : False, "error" : "Connector does not exist" }
     else: 
         # Send Delete request to KC 
-        retval, err_str = send_kconnect_kc_req(rbody, 'DELETE')
+        retdict = send_kconnect_kc_req(rbody, 'DELETE')
         # create new connector file and dump file there, if success from send_kconnect_kc_req
-        if retval == 'success':
+        if retdict['success'] is True:
             appconfig.update_kconnect_config(rbody['name'], rbody, 'DELETE')
         else: 
             pass #vne::tbd:: remove cert files if created
     
-    return {"success" : retval, "error" : err_str }
-
+    return {"success" : retdict['success'], "error" : retdict['error'] }
 
 
 def process_create_kconnect(rbody):
     """
     
     """
-    retval = True
-    err_str = 'None'
     #validate secret token 
     if appconfig.get_kconnect_auth_token() != rbody['auth_token']: 
         #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_kconnect_auth_token()
@@ -724,7 +719,7 @@ def process_create_kconnect(rbody):
         #TLS Support 
         for rbody_key in g_ssl_kc_keys:
             if rbody_key in rbody.keys():
-                cert_file = appconfig.get_kconnect_cert_path() + rbody_key
+                cert_file = appconfig.get_kconnect_cert_path() + rbody['name'] + rbody_key
                 file_fp = open(cert_file,"w")
                 file_fp.write(rbody[rbody_key])
                 file_fp.close()
@@ -746,8 +741,6 @@ def process_update_kconnect(rbody):
     """
     
     """
-    retval = True
-    err_str = 'None'
     #validate secret token 
     if appconfig.get_kconnect_auth_token() != rbody['auth_token']: 
         #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_kconnect_auth_token()
@@ -768,7 +761,7 @@ def process_update_kconnect(rbody):
         
         for rbody_key in g_ssl_kc_keys:
             if rbody_key in rbody.keys():
-                cert_file = appconfig.get_kconnect_cert_path() + rbody_key
+                cert_file = appconfig.get_kconnect_cert_path() + rbody['name'] + rbody_key
                 file_fp = open(cert_file,"w")
                 file_fp.write(rbody[rbody_key])
                 file_fp.close()
