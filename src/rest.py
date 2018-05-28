@@ -179,6 +179,13 @@ def process_connection_config(rbody):
         #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_mqtt_auth_token()
         return { "success" : False, "error" : "Request Unauthorized" }
     
+    
+    if rbody['tcp_port'] == '0':
+        if 'tls_port' in rbody.keys() and rbody['tls_port'] == '0':
+            #stop nginx 
+            subprocess.call(["service", "nginx", "stop"])
+            return {"success" : retval, "error" : err_str }
+    
     nginx_file = appconfig.get_nginx_config()
     nginx_tmp_file = appconfig.get_tmp_path() + nginx_file.split('/')[-1]
 
@@ -273,6 +280,7 @@ def process_connection_config(rbody):
     #make config changes to nginx server 
     if retval is not False: 
         #vne:: tbd: check the status and start if nginx is not already running
+        subprocess.call(["service", "nginx", "start"])
         subprocess.call(["service", "nginx", "reload"])
         return process_nginx_vmq_req(rbody)
     else:             
