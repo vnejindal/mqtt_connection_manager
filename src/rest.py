@@ -18,6 +18,7 @@ import json
 import re
 import subprocess
 import urllib2
+import os
 
 from bottle import run, Bottle, request
 
@@ -282,6 +283,9 @@ def process_sslcerts_nginx(filename):
     This function changes certificate and private key files to a format which is parsed by Nginx module
     -----BEGIN PRIVATE KEY-----
     -----END PRIVATE KEY----- 
+ 
+    -----BEGIN RSA PRIVATE KEY-----
+    -----END RSA PRIVATE KEY-----
     
     -----BEGIN CERTIFICATE-----
     -----END CERTIFICATE-----
@@ -293,6 +297,8 @@ def process_sslcerts_nginx(filename):
     file_fp.close()
 
     #print 'processing ', filename, file_str
+    ### Remove any newlines first if present   
+    file_str = file_str.replace('\n','')
     
     cert_type = ''
     
@@ -310,6 +316,8 @@ def process_sslcerts_nginx(filename):
         pass
         file_str = file_str.replace("-----BEGIN PRIVATE KEY-----", "\n-----BEGIN PRIVATE KEY-----\n")
         file_str = file_str.replace("-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----")
+        file_str = file_str.replace("-----BEGIN RSA PRIVATE KEY-----", "\n-----BEGIN RSA PRIVATE KEY-----\n")
+        file_str = file_str.replace("-----END RSA PRIVATE KEY-----", "\n-----END RSA PRIVATE KEY-----")
     else: 
         pass
         file_str = file_str.replace("-----BEGIN CERTIFICATE-----", "\n-----BEGIN CERTIFICATE-----\n")
@@ -719,7 +727,7 @@ def process_create_kconnect(rbody):
         #TLS Support 
         for rbody_key in g_ssl_kc_keys:
             if rbody_key in rbody.keys():
-                cert_file = appconfig.get_kconnect_cert_path() + rbody['name'] + rbody_key
+                cert_file = os.getcwd() + '/' + appconfig.get_kconnect_cert_path() + rbody['name'] + rbody_key
                 file_fp = open(cert_file,"w")
                 file_fp.write(rbody[rbody_key])
                 file_fp.close()
@@ -761,7 +769,7 @@ def process_update_kconnect(rbody):
         
         for rbody_key in g_ssl_kc_keys:
             if rbody_key in rbody.keys():
-                cert_file = appconfig.get_kconnect_cert_path() + rbody['name'] + rbody_key
+                cert_file = os.getcwd() + '/' + appconfig.get_kconnect_cert_path() + rbody['name'] + rbody_key
                 file_fp = open(cert_file,"w")
                 file_fp.write(rbody[rbody_key])
                 file_fp.close()
