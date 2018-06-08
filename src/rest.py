@@ -114,7 +114,7 @@ def create_connection_config():
         appconfig.get_app_logger().info('POST received, %s:%s', request, rbody)
         #print 'POST received', request, rbody  
     
-        return process_connection_config(rbody)
+        return process_connection_config_v1(rbody)
     except: 
         appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
@@ -138,7 +138,7 @@ def update_connection_config():
         #print 'PUT received', request, rbody  
         appconfig.get_app_logger().info('PUT received, %s:%s', request, rbody)
     
-        return process_connection_config(rbody)   
+        return process_connection_config_v1(rbody)   
     except: 
         appconfig.get_app_logger().exception('Invalid Request. Some Exception, %s, %s', appconfig.get_app_module(), request.url)
         return { "success" : False, "error" : "Invalid Request. Some Exception" }
@@ -307,12 +307,14 @@ def process_connection_config_v1(rbody):
             subprocess.call(["service", "nginx", "stop"])
             return {"success" : retval, "error" : err_str }
     
+    """ 
     nginx_file = appconfig.get_nginx_config()
     nginx_tmp_file = appconfig.get_tmp_path() + nginx_file.split('/')[-1]
 
     appconfig.get_app_logger().debug('copying %s %s', nginx_file, nginx_tmp_file)
     subprocess.call(["cp", nginx_file, nginx_tmp_file])
-    
+    """
+
     #print 'in process_connection_config', nginx_file
 
     #Update nginx_config 
@@ -322,12 +324,10 @@ def process_connection_config_v1(rbody):
         appconfig.set_nginx_config('tcp')
         
     if 'tls_enabled' in rbody.keys() and rbody['tls_enabled'] == '1':
-        appconfig.set_nginx_tcp_port(rbody['tls_port'])
-        appconfig.set_nginx_config('tls')
-    
-    if 'client_auth_enabled' in rbody.keys():
-        appconfig.set_nginx_verify_client(rbody['client_auth_enabled'])
-        appconfig.set_nginx_config('tls')
+        appconfig.set_nginx_ssl_port(rbody['tls_port'])
+        if 'client_auth_enabled' in rbody.keys():
+            appconfig.set_nginx_verify_client(rbody['client_auth_enabled'])
+            appconfig.set_nginx_config('tls')
 
     appconfig.nginx_config_dump()
     

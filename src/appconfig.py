@@ -113,11 +113,10 @@ def load_nginx_params_v1():
     nginx_config = load(open(get_nginx_config()))
     g_config['nginx_config'] = nginx_config
     
-    nginx_config_base = load(get_tmp_path() + '/stream.conf')
+    nginx_config_base = load(open(get_tmp_path() + '/stream.conf'))
     g_config['nginx_config_base'] = nginx_config_base
     
     set_nginx_upstream_mqtt_server()
-    
     
     ## Assumes stream.conf file in order
     ## upstream block 
@@ -128,7 +127,11 @@ def load_nginx_params_v1():
     g_config['ssl_certificate_key'] = '/'.join([os.getcwd(), get_tmp_path() + 'server.key'])
     g_config['ssl_client_certificate'] = '/'.join([os.getcwd(), get_tmp_path() + 'client.crt'])
     g_config['upstream_mqtt_server'] = get_nginx_upstream_mqtt_server()
-    
+
+    g_config['nginx_config_base'][2][1][2][1] = g_config['ssl_certificate']
+    g_config['nginx_config_base'][2][1][3][1] = g_config['ssl_certificate_key']
+    g_config['nginx_config_base'][2][1][10][1] = g_config['ssl_client_certificate']
+
     return 
 
 def load_nginx_params():
@@ -208,14 +211,15 @@ def set_nginx_ssl_port(port_num):
 def set_nginx_verify_client(cauth):
     global g_config
     if cauth == '1':
-        g_config['nginx_config_base'][2][1][10][1] = 'on'
+        g_config['nginx_config_base'][2][1][9][1] = 'on'
     elif cauth == '0':
-        g_config['nginx_config_base'][2][1][10][1] = 'off'
+        g_config['nginx_config_base'][2][1][9][1] = 'off'
 
 def create_nginx_config():
     global g_config
     g_config.pop('nginx_config', None)
-    g_config['nginx_config'][0] = g_config['nginx_config_base'][0]
+    g_config['nginx_config'] = []
+    g_config['nginx_config'].insert(0, g_config['nginx_config_base'][0])
 
 def set_nginx_config(type = 'tcp'):
     """
@@ -223,9 +227,12 @@ def set_nginx_config(type = 'tcp'):
     """
     global g_config
     if type == 'tcp' or type == 'both':
-        g_config['nginx_config'][1] = g_config['nginx_config_base'][1]
+        g_config['nginx_config'].insert(1, g_config['nginx_config_base'][1])
     if type == 'tls':
-        g_config['nginx_config'][2] = g_config['nginx_config_base'][2]
+        g_config['nginx_config'].insert(2, g_config['nginx_config_base'][2])
+
+    if len(g_config['nginx_config']) > 3: 
+       g_config['nginx_config'].pop()
 
 def nginx_config_dump():
     global g_config
