@@ -286,6 +286,103 @@ def process_connection_config(rbody):
     else:             
         return {"success" : retval, "error" : err_str }
 
+
+def process_connection_config_v1(rbody):
+    """
+    using nginxparser module 
+    """
+    
+    retval = True
+    err_str = 'None'
+    #validate secret token 
+    if appconfig.get_mqtt_auth_token() != rbody['auth_token']: 
+        appconfig.get_app_logger().error('Request Unauthorized, %s:%s', rbody['auth_token'], appconfig.get_mqtt_auth_token())
+        #print 'Request Unauthorized', rbody['auth_token'], appconfig.get_mqtt_auth_token()
+        return { "success" : False, "error" : "Request Unauthorized" }
+    
+    
+    if rbody['tcp_port'] == '0':
+        if 'tls_port' in rbody.keys() and rbody['tls_port'] == '0':
+            #stop nginx 
+            subprocess.call(["service", "nginx", "stop"])
+            return {"success" : retval, "error" : err_str }
+    
+    nginx_file = appconfig.get_nginx_config()
+    nginx_tmp_file = appconfig.get_tmp_path() + nginx_file.split('/')[-1]
+
+    appconfig.get_app_logger().debug('copying %s %s', nginx_file, nginx_tmp_file)
+    subprocess.call(["cp", nginx_file, nginx_tmp_file])
+    
+    #print 'in process_connection_config', nginx_file
+
+    #Update nginx_config 
+    appconfig.create_nginx_config()
+    if 'tcp_enabled' in rbody.keys() and rbody['tcp_enabled'] == '1':
+        appconfig.set_nginx_tcp_port(rbody['tcp_port'])
+        appconfig.set_nginx_config('tcp')
+        
+    if 'tls_enabled' in rbody.keys() and rbody['tls_enabled'] == '1':
+        appconfig.set_nginx_tcp_port(rbody['tls_port'])
+        appconfig.set_nginx_config('tls')
+    
+    if 'client_auth_enabled' in rbody.keys():
+        appconfig.set_nginx_verify_client(rbody['client_auth_enabled'])
+        appconfig.set_nginx_config('tls')
+
+    appconfig.nginx_config_dump()
+    
+    ## Update certificate files if any        
+    srv_cert_file = appconfig.get_server_cert_file() 
+    srv_cert_key_file = appconfig.get_server_cert_key_file()
+    client_cert_file = appconfig.get_client_cert_file()
+
+    srv_cert_tmp_file = appconfig.get_tmp_path() + srv_cert_file.split('/')[-1]
+    srv_cert_key_tmp_file = appconfig.get_tmp_path() + srv_cert_key_file.split('/')[-1]
+    client_cert_tmp_file = appconfig.get_tmp_path() + client_cert_file.split('/')[-1]
+    
+    # update certificates 
+    if rbody['tls_enabled'] == '1':
+        #update server cert files 
+        file_fp = open(srv_cert_tmp_file,"w")
+        file_fp.write(rbody['server_cert'])
+        file_fp.close()
+        
+        file_fp = open(srv_cert_key_tmp_file,"w")
+        file_fp.write(rbody['server_cert_key'])
+        file_fp.close()
+        
+        process_sslcerts_nginx(srv_cert_tmp_file)
+        process_sslcerts_nginx(srv_cert_key_tmp_file)
+
+        appconfig.get_app_logger().debug('copying %s %s', srv_cert_tmp_file, srv_cert_file)
+        appconfig.get_app_logger().debug('copying %s %s', srv_cert_key_tmp_file, srv_cert_key_file)
+        subprocess.call(["cp", srv_cert_tmp_file, srv_cert_file])
+        subprocess.call(["cp", srv_cert_key_tmp_file, srv_cert_key_file])
+        
+        if rbody['client_auth_enabled'] == '1':
+            file_fp = open(client_cert_tmp_file,"w")
+            file_fp.write(rbody['client_ca_cert'])
+            file_fp.close()
+            process_sslcerts_nginx(client_cert_tmp_file)
+            subprocess.call(["cp", client_cert_tmp_file, client_cert_file])
+            
+    elif rbody['tls_enabled'] == '0':
+        #print 'TLS disabled, doing nothing..'
+        pass
+    else: 
+        retval = False; err_str = 'tls_enabled ' + rbody['tls_enabled'] 
+    
+    #make config changes to nginx server 
+    if retval is not False: 
+        #vne:: tbd: check the status and start if nginx is not already running
+        subprocess.call(["service", "nginx", "start"])
+        subprocess.call(["service", "nginx", "reload"])
+        return process_nginx_vmq_req(rbody)
+    else:             
+        return {"success" : retval, "error" : err_str }
+
+
+
 def process_sslcerts_nginx(filename):
     """
     This function changes certificate and private key files to a format which is parsed by Nginx module

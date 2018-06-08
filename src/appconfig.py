@@ -10,7 +10,10 @@ import threading
 from time import sleep
 import urllib2
 import rest
+import sys 
+sys.path.append('nginxparser')
 
+from nginxparser import NginxParser, load,  dumps
 
 import applog
 
@@ -29,7 +32,7 @@ def init_appconfig(json_file):
         os.makedirs(g_config['tmp_path'])
     
     if get_app_module() == 'web':
-        load_nginx_params()
+        load_nginx_params_v1()
     elif get_app_module() == 'kconnect':
         init_kconnect_config()
     print 'Config loaded'
@@ -98,6 +101,36 @@ def kconnect_sync_thread(stime):
                 rest.send_kconnect_kc_req(get_kconnect_config()[key], 'POST')
                 
 
+def load_nginx_params_v1():
+    """
+    Uses nginxparser module 
+    nginx_config : Runtime nginx_config 
+    nginx_config_base : config picked from base nginx file
+    """
+    global g_config
+    
+    #nginx_fp = open(get_nginx_config(), "r")
+    nginx_config = load(open(get_nginx_config()))
+    g_config['nginx_config'] = nginx_config
+    
+    nginx_config_base = load(get_tmp_path() + '/stream.conf')
+    g_config['nginx_config_base'] = nginx_config_base
+    
+    set_nginx_upstream_mqtt_server()
+    
+    
+    ## Assumes stream.conf file in order
+    ## upstream block 
+    ## TCP stream block 
+    ## TLS stream block 
+    
+    g_config['ssl_certificate'] = '/'.join([os.getcwd(), get_tmp_path() + 'server.crt']) 
+    g_config['ssl_certificate_key'] = '/'.join([os.getcwd(), get_tmp_path() + 'server.key'])
+    g_config['ssl_client_certificate'] = '/'.join([os.getcwd(), get_tmp_path() + 'client.crt'])
+    g_config['upstream_mqtt_server'] = get_nginx_upstream_mqtt_server()
+    
+    return 
+
 def load_nginx_params():
     """
     reads TLS files info from provisioned nginx conf file 
@@ -155,6 +188,50 @@ def get_rest_port():
 def get_nginx_config():
     global g_config
     return g_config['nginx_file']
+
+def get_nginx_upstream_mqtt_server():
+    global g_config
+    return g_config['nginx_config'][0][1][0][1].split(':')[0]
+
+def set_nginx_upstream_mqtt_server():
+    global g_config
+    g_config['nginx_config_base'][0][1][0][1] = get_nginx_upstream_mqtt_server() + ':1883'
+    
+def set_nginx_tcp_port(port_num):
+    global g_config
+    g_config['nginx_config_base'][1][1][0][1] = str(port_num)
+
+def set_nginx_ssl_port(port_num):
+    global g_config
+    g_config['nginx_config_base'][2][1][0][1] = str(port_num) + ' ssl'
+
+def set_nginx_verify_client(cauth):
+    global g_config
+    if cauth == '1':
+        g_config['nginx_config_base'][2][1][10][1] = 'on'
+    elif cauth == '0':
+        g_config['nginx_config_base'][2][1][10][1] = 'off'
+
+def create_nginx_config():
+    global g_config
+    g_config.pop('nginx_config', None)
+    g_config['nginx_config'][0] = g_config['nginx_config_base'][0]
+
+def set_nginx_config(type = 'tcp'):
+    """
+    type = tcp, tls , both 
+    """
+    global g_config
+    if type == 'tcp' or type == 'both':
+        g_config['nginx_config'][1] = g_config['nginx_config_base'][1]
+    if type == 'tls':
+        g_config['nginx_config'][2] = g_config['nginx_config_base'][2]
+
+def nginx_config_dump():
+    global g_config
+    fp = open(get_nginx_config(), 'w')
+    fp.write(dumps(g_config['nginx_config']))
+    fp.close()
 
 def get_mqtt_auth_token():
     global g_config
